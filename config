@@ -1,0 +1,146 @@
+// Zed keymap
+//
+// For information on binding keys, see the Zed
+// documentation: https://zed.dev/docs/key-bindings
+//
+// To see the default key bindings run `zed: open default keymap`
+// from the command palette.
+[
+  {
+    "context": "Workspace",
+    "bindings": {
+      // "shift shift": "file_finder::Toggle"
+    },
+  },
+  {
+    "context": "Editor && vim_mode == insert",
+    "bindings": {
+      // "j k": "vim::NormalBefore"
+    },
+  },
+  {
+    "context": "Pane  && !VimControl",
+    "bindings": {
+      "ctrl-w": [
+        "pane::CloseActiveItem",
+        {
+          "close_pinned": false,
+        },
+      ],
+    },
+  },
+  {
+    "context": "Pane",
+    "bindings": {
+      "ctrl-w": null,
+      "ctrl-f4": null,
+    },
+  },
+  {
+    "context": "((VimControl && !menu) || (!Editor && !Terminal))",
+    "bindings": {
+      "alt-h": "workspace::ActivatePaneLeft",
+      "alt-j": "workspace::ActivatePaneDown",
+      "alt-k": "workspace::ActivatePaneUp",
+      "alt-l": "workspace::ActivatePaneRight",
+      "ctrl-w =": null,
+      "ctrl-w _": null,
+      "ctrl-w c": null,
+      "ctrl-w ctrl-c": null,
+      "ctrl-w ctrl-h": null,
+      "ctrl-w ctrl-j": null,
+      "ctrl-w ctrl-k": null,
+      "ctrl-w ctrl-l": null,
+      "ctrl-w ctrl-q": null,
+      "ctrl-w ctrl-s": null,
+      "ctrl-w ctrl-v": null,
+      "ctrl-w down": null,
+      "ctrl-w h": null,
+      "ctrl-w l": null,
+      "ctrl-w left": null,
+      "ctrl-w q": null,
+      "ctrl-w right": null,
+      "ctrl-w s": null,
+      "ctrl-w shift-s": null,
+      "ctrl-w up": null,
+      "ctrl-w v": null,
+      "space w -": "pane::SplitHorizontal",
+      "space w =": "vim::ResetPaneSizes",
+      "space w _": "pane::SplitVertical",
+      "space w d": "pane::CloseActiveItem",
+      "space w h": "workspace::ActivatePaneLeft",
+      "space w j": "workspace::ActivatePaneDown",
+      "space w k": "workspace::ActivatePaneUp",
+      "space w l": "workspace::ActivatePaneRight",
+      "space w m": "vim::MaximizePane",
+      "space w q": "pane::CloseActiveItem",
+    },
+  },
+  {
+    "context": "((vim_mode == helix_normal || vim_mode == helix_select) && !menu)",
+    "bindings": {
+      "space w d": null,
+      "space w h": null,
+      "space w j": null,
+      "space w k": null,
+      "space w l": null,
+      "space w s": null,
+      "space w v": null,
+    },
+  },
+  {
+    "context": "Workspace",
+    "bindings": {
+      "ctrl-k ctrl-down": null,
+      "ctrl-k ctrl-left": null,
+      "ctrl-k ctrl-right": null,
+      "ctrl-k ctrl-up": null,
+      "alt-1": null,
+      "alt-2": null,
+      "alt-3": null,
+      "alt-4": null,
+      "alt-5": null,
+      "alt-6": null,
+      "alt-7": null,
+      "alt-8": null,
+      "alt-9": null,
+    },
+  },
+  {
+    "bindings": {
+      "alt-shift-l": "pane::ActivateNextItem",
+      "alt-shift-h": "pane::ActivatePreviousItem",
+      "space b b": "tab_switcher::ToggleAll",
+    },
+  },
+  {
+    "context": "VimControl && !menu",
+    "bindings": {
+      "space": null,
+    },
+  },
+  {
+    "context": "((VimControl && !menu) || (!Editor && !Terminal))",
+    "bindings": {
+      "ctrl-w w": null,
+    },
+  },
+  {
+    "context": "((VimControl && !menu) || (!Editor && !Terminal))",
+    "bindings": {
+      "ctrl-w ctrl-w": null,
+    },
+  },
+  {
+    "context": "((VimControl && !menu)) || (!Editor && !Terminal)",
+    "bindings": {
+      "space f e": [
+        "file_finder::Toggle",
+        {
+          "search_history_only": true
+        }
+      ]
+    }
+  }
+]
+
