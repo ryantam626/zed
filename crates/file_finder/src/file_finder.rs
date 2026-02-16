@@ -103,7 +103,7 @@ impl FileFinder {
         workspace.register_action(
             |workspace, action: &workspace::ToggleFileFinder, window, cx| {
                 let Some(file_finder) = workspace.active_modal::<Self>(cx) else {
-                    Self::open(workspace, action.separate_history, window, cx).detach();
+                    Self::open(workspace, action.separate_history, action.search_history_only, window, cx).detach();
                     return;
                 };
 
@@ -120,6 +120,7 @@ impl FileFinder {
     fn open(
         workspace: &mut Workspace,
         separate_history: bool,
+        search_history_only: bool,
         window: &mut Window,
         cx: &mut Context<Workspace>,
     ) -> Task<()> {
@@ -172,6 +173,7 @@ impl FileFinder {
                             currently_opened_path,
                             history_items.collect(),
                             separate_history,
+                            search_history_only,
                             window,
                             cx,
                         );
@@ -403,6 +405,7 @@ pub struct FileFinderDelegate {
     cancel_flag: Arc<AtomicBool>,
     history_items: Vec<FoundPath>,
     separate_history: bool,
+    search_history_only: bool,
     first_update: bool,
     filter_popover_menu_handle: PopoverMenuHandle<ContextMenu>,
     split_popover_menu_handle: PopoverMenuHandle<ContextMenu>,
@@ -829,6 +832,7 @@ impl FileFinderDelegate {
         currently_opened_path: Option<FoundPath>,
         history_items: Vec<FoundPath>,
         separate_history: bool,
+        search_history_only: bool,
         window: &mut Window,
         cx: &mut Context<FileFinder>,
     ) -> Self {
@@ -848,6 +852,7 @@ impl FileFinderDelegate {
             cancel_flag: Arc::new(AtomicBool::new(false)),
             history_items,
             separate_history,
+            search_history_only,
             first_update: true,
             filter_popover_menu_handle: PopoverMenuHandle::default(),
             split_popover_menu_handle: PopoverMenuHandle::default(),
@@ -1423,6 +1428,50 @@ impl PickerDelegate for FileFinderDelegate {
                 self.first_update = false;
                 self.selected_index = 0;
             }
+            cx.notify();
+            Task::ready(())
+        } else if self.search_history_only {
+            let project = self.project.read(cx);
+            let path_position = PathWithPosition::parse_str(raw_query);
+            let raw_query = raw_query.trim().trim_end_matches(':').to_owned();
+            let path_str = path_position.path.to_str();
+            let path_trimmed = path_str.unwrap_or(&raw_query).trim_end_matches(':');
+            let file_query_end = if path_trimmed == raw_query {
+                None
+            } else {
+                // Safe to unwrap as we won't get here when the unwrap in if fails
+                Some(path_str.unwrap().len())
+            };
+
+            let query = FileSearchQuery {
+                raw_query,
+                file_query_end,
+                path_position,
+            };
+            let path_style = self.project.read(cx).path_style(cx);
+
+            self.latest_search_query = Some(query.clone());
+
+            self.matches.push_new_matches(
+                project.worktree_store(),
+                cx,
+                self.history_items.iter().filter(|history_item| {
+                    project
+                        .worktree_for_id(history_item.project.worktree_id, cx)
+                        .is_some()
+                        || project.is_local()
+                        || project.is_via_remote_server()
+                }),
+                self.currently_opened_path.as_ref(),
+                Some(&query),
+                None.into_iter(),
+                false,
+                path_style,
+            );
+
+            self.selected_index = self.calculate_selected_index(cx)
+                .min(self.matches.len().saturating_sub(1));
+
             cx.notify();
             Task::ready(())
         } else {
