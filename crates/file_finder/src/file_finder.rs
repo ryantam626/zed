@@ -140,6 +140,7 @@ impl FileFinder {
             .recent_navigation_history(Some(MAX_RECENT_SELECTIONS), cx)
             .into_iter()
             .filter_map(|(project_path, abs_path)| {
+                println!("DEBUG: {:?} - {:?}", project_path, abs_path);
                 if project.entry_for_path(&project_path, cx).is_some() {
                     return Some(Task::ready(Some(FoundPath::new(project_path, abs_path?))));
                 }
