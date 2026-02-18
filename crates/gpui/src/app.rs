@@ -37,14 +37,14 @@ pub use visual_test_context::*;
 use crate::InspectorElementRegistry;
 use crate::{
     Action, ActionBuildError, ActionRegistry, Any, AnyView, AnyWindowHandle, AppContext, Arena,
-    Asset, AssetSource, BackgroundExecutor, Bounds, ClipboardItem, CursorStyle, DispatchPhase,
-    DisplayId, EventEmitter, FocusHandle, FocusMap, ForegroundExecutor, Global, KeyBinding,
-    KeyContext, Keymap, Keystroke, LayoutId, Menu, MenuItem, OwnedMenu, PathPromptOptions, Pixels,
-    Platform, PlatformDisplay, PlatformKeyboardLayout, PlatformKeyboardMapper, Point, Priority,
-    PromptBuilder, PromptButton, PromptHandle, PromptLevel, Render, RenderImage,
-    RenderablePromptHandle, Reservation, ScreenCaptureSource, SharedString, SubscriberSet,
-    Subscription, SvgRenderer, Task, TextRenderingMode, TextSystem, ThermalState, Window,
-    WindowAppearance, WindowHandle, WindowId, WindowInvalidator,
+    ArenaBox, Asset, AssetSource, BackgroundExecutor, Bounds, ClipboardItem, CursorStyle,
+    DispatchPhase, DisplayId, EventEmitter, FocusHandle, FocusMap, ForegroundExecutor, Global,
+    KeyBinding, KeyContext, Keymap, Keystroke, LayoutId, Menu, MenuItem, OwnedMenu,
+    PathPromptOptions, Pixels, Platform, PlatformDisplay, PlatformKeyboardLayout,
+    PlatformKeyboardMapper, Point, Priority, PromptBuilder, PromptButton, PromptHandle,
+    PromptLevel, Render, RenderImage, RenderablePromptHandle, Reservation, ScreenCaptureSource,
+    SharedString, SubscriberSet, Subscription, SvgRenderer, Task, TextRenderingMode, TextSystem,
+    ThermalState, Window, WindowAppearance, WindowHandle, WindowId, WindowInvalidator,
     colors::{Colors, GlobalColors},
     current_platform, hash, init_app_menus,
 };
@@ -643,6 +643,8 @@ pub struct App {
     /// Per-App element arena. This isolates element allocations between different
     /// App instances (important for tests where multiple Apps run concurrently).
     pub(crate) element_arena: RefCell<Arena>,
+    /// Per-App event arena.
+    pub(crate) event_arena: Arena,
 }
 
 impl App {
@@ -654,7 +656,6 @@ impl App {
     ) -> Rc<AppCell> {
         let background_executor = platform.background_executor();
         let foreground_executor = platform.foreground_executor();
-        let callback_executor = foreground_executor.clone();
         assert!(
             background_executor.is_main_thread(),
             "must construct App on main thread"
@@ -723,6 +724,7 @@ impl App {
                 #[cfg(any(test, feature = "test-support", debug_assertions))]
                 name: None,
                 element_arena: RefCell::new(Arena::new(1024 * 1024)),
+                event_arena: Arena::new(1024 * 1024),
             }),
         });
 
@@ -731,36 +733,26 @@ impl App {
 
         platform.on_keyboard_layout_change(Box::new({
             let app = Rc::downgrade(&app);
-            let executor = callback_executor.clone();
             move || {
                 if let Some(app) = app.upgrade() {
-                    executor
-                        .spawn(async move {
-                            let mut cx = app.borrow_mut();
-                            cx.keyboard_layout = cx.platform.keyboard_layout();
-                            cx.keyboard_mapper = cx.platform.keyboard_mapper();
-                            cx.keyboard_layout_observers
-                                .clone()
-                                .retain(&(), move |callback| (callback)(&mut cx));
-                        })
-                        .detach();
+                    let cx = &mut app.borrow_mut();
+                    cx.keyboard_layout = cx.platform.keyboard_layout();
+                    cx.keyboard_mapper = cx.platform.keyboard_mapper();
+                    cx.keyboard_layout_observers
+                        .clone()
+                        .retain(&(), move |callback| (callback)(cx));
                 }
             }
         }));
 
         platform.on_thermal_state_change(Box::new({
             let app = Rc::downgrade(&app);
-            let executor = callback_executor;
             move || {
                 if let Some(app) = app.upgrade() {
-                    executor
-                        .spawn(async move {
-                            let mut cx = app.borrow_mut();
-                            cx.thermal_state_observers
-                                .clone()
-                                .retain(&(), move |callback| (callback)(&mut cx));
-                        })
-                        .detach();
+                    let cx = &mut app.borrow_mut();
+                    cx.thermal_state_observers
+                        .clone()
+                        .retain(&(), move |callback| (callback)(cx));
                 }
             }
         }));
@@ -1351,7 +1343,7 @@ impl App {
                         emitter,
                         event_type,
                         event,
-                    } => self.apply_emit_effect(emitter, event_type, event),
+                    } => self.apply_emit_effect(emitter, event_type, &*event),
 
                     Effect::RefreshWindows => {
                         self.apply_refresh_effect();
@@ -1388,6 +1380,7 @@ impl App {
                 }
 
                 if self.pending_effects.is_empty() {
+                    self.event_arena.clear();
                     break;
                 }
             }
@@ -1445,12 +1438,12 @@ impl App {
             .retain(&emitter, |handler| handler(self));
     }
 
-    fn apply_emit_effect(&mut self, emitter: EntityId, event_type: TypeId, event: Box<dyn Any>) {
+    fn apply_emit_effect(&mut self, emitter: EntityId, event_type: TypeId, event: &dyn Any) {
         self.event_listeners
             .clone()
             .retain(&emitter, |(stored_type, handler)| {
                 if *stored_type == event_type {
-                    handler(event.as_ref(), self)
+                    handler(event, self)
                 } else {
                     true
                 }
@@ -2418,7 +2411,7 @@ pub(crate) enum Effect {
     Emit {
         emitter: EntityId,
         event_type: TypeId,
-        event: Box<dyn Any>,
+        event: ArenaBox<dyn Any>,
     },
     RefreshWindows,
     NotifyGlobalObservers {
